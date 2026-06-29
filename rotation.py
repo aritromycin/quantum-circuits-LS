@@ -5,6 +5,9 @@ DTYPE = np.complex128
 
 INV_SQRT2 = 1.0 / np.sqrt(2.0)
 H = INV_SQRT2 * np.array([[1, 1], [1, -1]], dtype=DTYPE)
+X = np.array([[0, 1], [1, 0]], dtype=DTYPE)
+Y = np.array([[0, -1j], [1j, 0]], dtype=DTYPE)
+Z = np.array([[1, 0], [0, -1]], dtype=DTYPE)
 
 # LAMBDA_PI is the base rotation angle realized by the H/T building blocks:
 # cos(LAMBDA_PI) = cos^2(pi/8) = (1 + 1/sqrt2)/2. Because LAMBDA_PI / (2 pi) is
@@ -26,17 +29,33 @@ class Bloch:
     n: np.ndarray  # unit rotation axis, shape (3,): [n_x, n_y, n_z]
     theta: float  # rotation angle
 
+def R_form(theta: float, n: np.ndarray) -> np.ndarray:
+    I = np.array([[1,0],[0,1]],dtype=DTYPE)
+    return I*np.cos(theta/2) - (n[0]*X + n[1]*Y + n[2]*Z)*(np.sin(theta/2)*1j)
+    
+
 
 def to_bloch(g: np.ndarray) -> Bloch:
     """Recover the Bloch form (alpha, n, theta) of a 2x2 unitary `g`."""
-    raise NotImplementedError("to_bloch is not implemented yet")
+    myDet = np.linalg.det(g)
+    alpha = np.angle(myDet)/2
+    g_prime = np.exp(-1j*alpha)*g
+    theta = 2 * np.arccos(np.trace(g_prime).real / 2)
+    n_x = (((1j/2)*np.trace(X @ g_prime))/(np.sin(theta/2))).real
+    n_y = (((1j/2)*np.trace(Y @ g_prime))/(np.sin(theta/2))).real
+    n_z = (((1j/2)*np.trace(Z @ g_prime))/(np.sin(theta/2))).real
+    b = Bloch()
+    b.alpha = alpha
+    b.n = np.array([n_x, n_y, n_z])
+    b.theta = theta
+    return b
 
 
 # n1, n2 are two orthogonal Bloch-sphere axes (n1 . n2 == 0)
 # TODO: fill in the two orthogonal rotation axes (each a length-3
 # unit vector [x, y, z])
-n1 = np.array([np.nan, np.nan, np.nan])
-n2 = np.array([np.nan, np.nan, np.nan])
+n1 = np.array([-(1/np.tan(np.pi/8)), 1, 1/np.tan(np.pi/8)])/np.sqrt(2*(1/np.tan(np.pi/8)**2) + 1) 
+n2 = np.array([INV_SQRT2, np.sqrt(2)*np.tan(np.pi/8), -INV_SQRT2])/np.sqrt(2/((np.tan(np.pi/8)**2)) + 1)
 
 # frame derived from the axes (given)
 # take the dot product of the Bloch axis with these
@@ -49,12 +68,27 @@ a3 = np.cross(a1, a2)
 def n1n2n1_angles(b: Bloch) -> tuple[float, float, float, float]:
     """Factor the rotation part of a unitary (given as its Bloch form `b`) as
         u = e^{i global_phase} * Rn1(alpha) * Rn2(beta) * Rn1(gamma)
-
+        
     where Ra(angle) is a rotation by `angle` about axis a, and {a1, a2, a3} is
     the orthonormal frame defined above. Returns (alpha, beta, gamma, global_phase).
     """
     # TODO(student): implement using the steps above.
-    raise NotImplementedError("n1n2n1_angles is not implemented yet")
+    gamma_plus_alpha = np.arctan2(-np.dot(b.n,a1)*np.sin(b.theta), np.cos(b.theta))
+    beta = np.arccos(np.clip(np.cos(b.theta)/np.cos(gamma_plus_alpha), -1, 1))
+    if np.isclose(np.sin(beta), 0):
+        gamma = -gamma_plus_alpha
+        alpha = 0.0
+    else:
+        gamma_minus_alpha = np.arccos(np.clip(-np.dot(b.n, a2)*np.sin(b.theta)/np.sin(beta), -1, 1))
+        gamma = (gamma_plus_alpha + gamma_minus_alpha) / 2
+        alpha = (gamma_plus_alpha - gamma_minus_alpha) / 2
+    R_alpha = R_form(alpha,a1)
+    R_beta = R_form(beta,a2)
+    R_gamma = R_form(gamma,a1)
+    # Correct matrix tracking sequence for global phase calculation:
+    combined_rotations = R_alpha @ R_beta @ R_gamma
+    global_phase = np.angle((np.exp(1j * b.alpha) * (R_form(b.theta, b.n) @ np.linalg.inv(combined_rotations)))[0][0])
+    return (alpha,beta,gamma,global_phase)
 
 
 def approx_angle_with_tolerance(angle: float, tolerance: float) -> int:
@@ -70,7 +104,13 @@ def approx_angle_with_tolerance(angle: float, tolerance: float) -> int:
         min(|a - b|, TWO_PI - |a - b|) (so 0.01 and 2*pi - 0.01 count as close).
     """
     # TODO(student): implement using the hint above.
-    raise NotImplementedError("approx_angle_with_tolerance is not implemented yet")
+    wrap = angle % TWO_PI
+    i = 1
+    while True:
+        wrapchecker = (i*LAMBDA_PI) % TWO_PI
+        if min(abs(wrapchecker-wrap), TWO_PI - abs(wrapchecker-wrap)) < tolerance:
+            return i
+        i=i+1
 
 
 def decompose_2x2(u: np.ndarray, tolerance: float) -> tuple[int, int, int]:
@@ -100,4 +140,9 @@ def decompose_2x2(u: np.ndarray, tolerance: float) -> tuple[int, int, int]:
       3. Return (k, l, m).
     """
     # TODO(student): implement using the steps above.
-    raise NotImplementedError("decompose_2x2 is not implemented yet")
+    bloch_u = to_bloch(u)
+    alpha, beta, gamma, _global_phase = n1n2n1_angles(to_bloch(u))
+    k = approx_angle_with_tolerance(alpha, tolerance) 
+    l = approx_angle_with_tolerance(beta,  tolerance)   
+    m = approx_angle_with_tolerance(gamma, tolerance)  
+    return (k,l,m)
