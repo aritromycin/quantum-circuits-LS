@@ -90,6 +90,32 @@ def n1n2n1_angles(b: Bloch) -> tuple[float, float, float, float]:
     global_phase = np.angle((np.exp(1j * b.alpha) * (R_form(b.theta, b.n) @ np.linalg.inv(combined_rotations)))[0][0])
     return (alpha,beta,gamma,global_phase)
 
+def zyz_angles(b: Bloch) -> tuple[float, float, float, float]:
+    """Same as n1n2n1_angles, but factoring into the standard Z-Y-Z frame instead
+    of the H/T frame: u = e^{i global_phase} * Rz(alpha) * Ry(beta) * Rz(gamma).
+    """
+    a1 = np.array([0, 0, 1])  # Z axis
+    a2 = np.array([0, 1, 0])  # Y axis
+
+    gamma_plus_alpha = np.arctan2(-np.dot(b.n, a1) * np.sin(b.theta), np.cos(b.theta))
+    beta = np.arccos(np.clip(np.cos(b.theta) / np.cos(gamma_plus_alpha), -1, 1))
+    if np.isclose(np.sin(beta), 0):
+        gamma = -gamma_plus_alpha
+        alpha = 0.0
+    else:
+        gamma_minus_alpha = np.arccos(np.clip(-np.dot(b.n, a2) * np.sin(b.theta) / np.sin(beta), -1, 1))
+        gamma = (gamma_plus_alpha + gamma_minus_alpha) / 2
+        alpha = (gamma_plus_alpha - gamma_minus_alpha) / 2
+
+    R_alpha = R_form(alpha, a1)
+    R_beta = R_form(beta, a2)
+    R_gamma = R_form(gamma, a1)
+    combined_rotations = R_alpha @ R_beta @ R_gamma
+    global_phase = np.angle(
+        (np.exp(1j * b.alpha) * (R_form(b.theta, b.n) @ np.linalg.inv(combined_rotations)))[0][0]
+    )
+    return (alpha, beta, gamma, global_phase)
+
 
 def approx_angle_with_tolerance(angle: float, tolerance: float) -> int:
     """Find an integer multiple k such that
