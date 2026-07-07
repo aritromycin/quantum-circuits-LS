@@ -172,3 +172,9 @@ def decompose_2x2(u: np.ndarray, tolerance: float) -> tuple[int, int, int]:
     l = approx_angle_with_tolerance(beta,  tolerance)   
     m = approx_angle_with_tolerance(gamma, tolerance)  
     return (k,l,m)
+
+def unitary2_sqrt(u:np.ndarray) -> np.ndarray:
+    eigenvalues, eigenvectors = np.linalg.eig(u)
+    sqrt_eigenvalues = np.sqrt(eigenvalues)
+    v = eigenvectors @ np.diag(sqrt_eigenvalues) @ eigenvectors.conj().T
+    return v
