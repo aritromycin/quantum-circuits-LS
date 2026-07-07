@@ -63,7 +63,7 @@ class TwoLevel:
         placed at rows/cols (level0, level1).
         """
         # TODO: implement.
-        mat = np.eye(size, dtype=complex)
+        mat = np.eye(self.size, dtype=complex)
         mat[self.level0, self.level0] = self.unitary[0,0]
         mat[self.level0, self.level1] = self.unitary[0,1]
         mat[self.level1, self.level0] = self.unitary[1,0]
@@ -201,11 +201,11 @@ class Swap:
     control_vals: list[bool]
 
     def to_unitary(self) -> np.ndarray:
-        N = 2**len(control_vals)
+        N = 2**len(self.control_vals)
         mat = np.eye(N, dtype=complex)
         for i in range(N):
             tbit = (i >> self.target) & 1
-            if (all(((i >> q) & 1) == int(self.control_vals[q]) for q in range(len(control_vals)) if q != self.target) and tbit == 0):
+            if (all(((i >> q) & 1) == int(self.control_vals[q]) for q in range(len(self.control_vals)) if q != self.target) and tbit == 0):
                 mask = 1 << self.target
                 j = i ^ mask
                 mat[i,i] = 0
@@ -228,6 +228,8 @@ def circuit_to_unitary(circuit: Circuit) -> np.ndarray:
     result = g_last @ ... @ g_1. Assumes the circuit is non-empty.
     """
     # TODO: implement.
+    n = circuit[0].n
+    N = 2 ** n
     g_total = np.eye(N, dtype=complex)
     for i in Circuit:
         mygate = i.to_unitary()
@@ -541,7 +543,7 @@ def decompose_cu(g: CU) -> Circuit:
     """
     # TODO: implement using abc_decompose.
     myABC = abc_decompose(g.unitary)
-    phase_mat = np.array([[1, 0], [0, np.exp(1j * d.alpha)]], dtype=complex)
+    phase_mat = np.array([[1, 0], [0, np.exp(1j * myABC.alpha)]], dtype=complex)
     circuit = [SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.C),CNOT(n=g.n,control=g.control,target=g.target),SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.B),CNOT(n=g.n,control=g.control,target=g.target),SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.A),SingleQubitGate(n=g.n,qubit=g.control,unitary=myABC.phase_mat)]
     return circuit
 
