@@ -231,7 +231,7 @@ def circuit_to_unitary(circuit: Circuit) -> np.ndarray:
     n = circuit[0].n
     N = 2 ** n
     g_total = np.eye(N, dtype=complex)
-    for i in Circuit:
+    for i in circuit:
         mygate = i.to_unitary()
         g_total = mygate @ g_total
     return g_total
@@ -252,7 +252,7 @@ def error_up_to_phase(a: np.ndarray, b: np.ndarray) -> float:
     <b, a> = sum conj(b_ij) a_ij, then compare. ~0 means equal up to global phase.
     """
     # TODO: implement.
-    overlap = np.sum(np.conj(b),a)
+    overlap = np.sum(np.conj(b)*a)
     phase = overlap/np.abs(overlap)
     b_aligned = phase*b
     compare = np.linalg.norm(b_aligned - a)
@@ -355,7 +355,7 @@ def decompose_unitary(u: np.ndarray) -> TwoLevels:
         L.extend(expand_twolevels(tls,n))
         for mat in tls:
             u_copy = mat.to_unitary() @ u_copy
-    phase = u[n-1,n-1]
+    phase = u_copy[n-1,n-1]
     phase_fix = np.array([[1,0],[0,np.conj(phase)]], dtype=complex)
     L.append(TwoLevel(size=n,level0=n-2,level1=n-1,unitary=phase_fix))
     return L
@@ -483,12 +483,15 @@ def decompose_twolevel(tl: TwoLevel) -> Circuit:
     for i in swaps[:-1]:
         L.extend(decompose_swap(i))
     last = swaps[-1]
-    bit = (tl.level0 >> last.target) & 1
-    if bit == 0:
-        mat = tl.unitary
-    else:
-        X = np.array([[0,1],[1,0]],dtype=complex)
+    before_state = 0
+    for q in range(n):
+        if q != last.target and last.control_vals[q]:
+            before_state |= (1 << q)
+    if tl.level0 != (before_state & ~(1 << last.target)):
+        X = np.array([[0, 1], [1, 0]], dtype=complex)
         mat = X @ tl.unitary @ X
+    else:
+        mat = tl.unitary
     last_trans = controlled_circuit(n,last.target,last.control_vals,mat)
     L_inverse = list(reversed(L))
     circuit = L + [last_trans] + L_inverse
@@ -544,7 +547,7 @@ def decompose_cu(g: CU) -> Circuit:
     # TODO: implement using abc_decompose.
     myABC = abc_decompose(g.unitary)
     phase_mat = np.array([[1, 0], [0, np.exp(1j * myABC.alpha)]], dtype=complex)
-    circuit = [SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.C),CNOT(n=g.n,control=g.control,target=g.target),SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.B),CNOT(n=g.n,control=g.control,target=g.target),SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.A),SingleQubitGate(n=g.n,qubit=g.control,unitary=myABC.phase_mat)]
+    circuit = [SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.C),CNOT(n=g.n,control=g.control,target=g.target),SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.B),CNOT(n=g.n,control=g.control,target=g.target),SingleQubitGate(n=g.n,qubit=g.target,unitary=myABC.A),SingleQubitGate(n=g.n,qubit=g.control,unitary=phase_mat)]
     return circuit
 
 
