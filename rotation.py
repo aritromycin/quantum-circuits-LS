@@ -202,10 +202,10 @@ def expand_word(word: list[int]) -> str:
     my_word = ""
     for i in range(len(word)):
         if i%2 == 0:
-            for j in range(i):
+            for j in range(word[i]):
                 my_word = my_word + 'T'
         else:
-            for j in range(i):
+            for j in range(word[i]):
                 my_word = my_word + 'H'
     return my_word
 
@@ -249,7 +249,9 @@ def power_gates(base: str, k: int) -> str:
     if k > 0:
         return base*k
     elif k < 0:
-        return invert_gates(base)*k
+        return invert_gates(base)*(-k)
+    else:
+        return ""
 
 
 def approximate_in_ht(u: np.ndarray, error: float) -> str:
