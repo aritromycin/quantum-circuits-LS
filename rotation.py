@@ -8,6 +8,7 @@ H = INV_SQRT2 * np.array([[1, 1], [1, -1]], dtype=DTYPE)
 X = np.array([[0, 1], [1, 0]], dtype=DTYPE)
 Y = np.array([[0, -1j], [1j, 0]], dtype=DTYPE)
 Z = np.array([[1, 0], [0, -1]], dtype=DTYPE)
+T = np.array([[1, 0], [0, np.exp(1j * np.pi / 4)]], dtype=DTYPE)
 
 # LAMBDA_PI is the base rotation angle realized by the H/T building blocks:
 # cos(LAMBDA_PI) = cos^2(pi/8) = (1 + 1/sqrt2)/2. Because LAMBDA_PI / (2 pi) is
@@ -178,3 +179,90 @@ def unitary2_sqrt(u:np.ndarray) -> np.ndarray:
     sqrt_eigenvalues = np.sqrt(eigenvalues)
     v = eigenvectors @ np.diag(sqrt_eigenvalues) @ eigenvectors.conj().T
     return v
+
+
+# ---------------------------------------------------------------------------
+# H/T word machinery for approximating a 2x2 unitary in {H, T} (see cpp/src/HT.h).
+#
+# M1, M2 are short H/T words that realize rotations by THETA_M = 2*LAMBDA_PI about
+# the axes a1, a2. A word is a flat string of 'H'/'T' characters, read left-to-right
+# as a matrix product (leftmost char = leftmost/outermost factor).
+# ---------------------------------------------------------------------------
+
+# alternating (T-power, H-power, ...) exponents, starting with T
+M1_WORD = [7, 1, 1, 1]
+M2_WORD = [2, 1, 1, 1, 6, 1, 7, 1, 5, 1, 1, 1, 2, 1, 1, 1, 2, 1, 7, 1, 6]
+
+
+def expand_word(word: list[int]) -> str:
+    """Flatten an alternating (T-power, H-power, ...) exponent list into a literal
+    string of 'H'/'T' gates (left-to-right). Even indices are T, odd indices are H.
+    """
+    # TODO: implement.
+    my_word = ""
+    for i in range(len(word)):
+        if i%2 == 0:
+            for j in range(i):
+                my_word = my_word + 'T'
+        else:
+            for j in range(i):
+                my_word = my_word + 'H'
+    return my_word
+
+
+# flat H/T strings for the two building-block words (computed once expand_word works)
+M1_STR = expand_word(M1_WORD)
+M2_STR = expand_word(M2_WORD)
+
+
+def gates_to_unitary(gates: str) -> np.ndarray:
+    """The 2x2 unitary of a flat H/T gate string (left-to-right product)."""
+    # TODO: implement (multiply H / T for each char, starting from I).
+    mat = np.eye(2,dtype=DTYPE)
+    for i in gates:
+        if i == 'H':
+            mat = mat @ H
+        else:
+            mat = mat @ T
+    return mat
+
+
+def invert_gates(gates: str) -> str:
+    """Inverse of a flat H/T word: reverse the gate order and invert each gate.
+    H^-1 = H; the {H, T} basis has no T-dagger, so T^-1 must be spelled as T^7.
+    """
+    # TODO: implement.
+    inv = ""
+    for i in gates[::-1]:
+        if i == 'H':
+            inv = inv + 'H'
+        else:
+            inv = inv + 'TTTTTTT'
+    return inv
+
+
+def power_gates(base: str, k: int) -> str:
+    """The k-th power of a flat H/T word: base repeated k times. Negative k uses the
+    inverse word (invert_gates).
+    """
+    # TODO: implement.
+    if k > 0:
+        return base*k
+    elif k < 0:
+        return invert_gates(base)*k
+    return mat
+
+
+def approximate_in_ht(u: np.ndarray, error: float) -> str:
+    """Approximate a 2x2 unitary `u` by a flat H/T word (up to global phase) to the
+    angular tolerance `error` (smaller -> longer, more accurate).
+
+    Use decompose_2x2 to get the powers (k, l, m) with u ~= M1^k M2^l M1^m, then
+    assemble the word:
+
+        power_gates(M1_STR, k) + power_gates(M2_STR, l) + power_gates(M1_STR, m).
+    """
+    # TODO: implement using decompose_2x2 and power_gates.
+    k,l,m = decompose_2x2(u,error)
+    approx = power_gates(M1_STR, k) + power_gates(M2_STR, l) + power_gates(M1_STR, m)
+    return approx
