@@ -434,7 +434,7 @@ def gray_code(tl: TwoLevel) -> list[Swap]:
     L = []
     for i in diff_bits:
         control_values = [bool((current >> q) & 1) for q in range(n)]
-        result.append(Swap(target=i,control_vals=control_values)
+        L.append(Swap(target=i,control_vals=control_values))
     return L
 
 
