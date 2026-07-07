@@ -250,7 +250,6 @@ def power_gates(base: str, k: int) -> str:
         return base*k
     elif k < 0:
         return invert_gates(base)*k
-    return mat
 
 
 def approximate_in_ht(u: np.ndarray, error: float) -> str:
